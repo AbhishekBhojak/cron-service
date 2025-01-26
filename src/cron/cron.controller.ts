@@ -32,7 +32,7 @@ import {
 } from './decorator';
 import { PaginatedResponse } from './interface/api.interface';
 
-@Controller('cron')
+@Controller('api/v1/cron-jobs/')
 @UseGuards(ThrottlerGuard)
 export class CronController {
   constructor(private readonly cronService: CronService) {}
