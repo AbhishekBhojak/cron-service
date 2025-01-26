@@ -140,9 +140,9 @@ Here are some sample cron expressions you can use:
 - **Endpoint**: `/api/v1/cron-jobs/:id`
 - **Method**: DELETE
 
-### 5. View Cron Job Execution History
+### 5. View Cron Job Webhook Data
 
-- **Endpoint**: `/api/v1/cron-jobs/:id/history`
+- **Endpoint**: `/api/v1/cron-jobs/webhook`
 - **Method**: GET
 
 ## Troubleshooting
