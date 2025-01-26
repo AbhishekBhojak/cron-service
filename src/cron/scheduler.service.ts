@@ -4,6 +4,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CronJobDocument } from './schema/cron-job.schema';
 import { SchedulerRegistry } from '@nestjs/schedule';
+import { WebhookData, WebHookDocument } from './schema/webhook-data.schema';
+import { JobHistory, JobHistoryDocument } from './schema/job-history.schema';
 
 @Injectable()
 export class SchedulerService implements OnApplicationBootstrap {
@@ -11,8 +13,10 @@ export class SchedulerService implements OnApplicationBootstrap {
   private jobs: Map<string, CronJob> = new Map();
 
   constructor(
-    @InjectModel('CronJob')
-    private readonly cronJobModel: Model<CronJobDocument>,
+    @InjectModel(CronJob.name) private cronJobModel: Model<CronJobDocument>,
+    @InjectModel(WebhookData.name) private webHookModel: Model<WebHookDocument>,
+    @InjectModel(JobHistory.name)
+    private jobHistoryModel: Model<JobHistoryDocument>,
     private schedulerRegistry: SchedulerRegistry,
   ) {}
 
@@ -24,7 +28,8 @@ export class SchedulerService implements OnApplicationBootstrap {
   async loadJobsFromDatabase(): Promise<void> {
     const now: Date = new Date();
 
-    this.test();
+    this.cronTest();
+
     try {
       const cronJobs = await this.cronJobModel
         .find({
@@ -34,7 +39,7 @@ export class SchedulerService implements OnApplicationBootstrap {
         .exec();
 
       cronJobs.forEach((job) => {
-        const id = job._id.toString(); // Convert ObjectId to string
+        const id = job._id.toString();
         if (!this.schedulerRegistry.doesExist('cron', id)) {
           this.addCronJob(job);
         }
@@ -48,9 +53,6 @@ export class SchedulerService implements OnApplicationBootstrap {
 
   async addCronJob(job: CronJobDocument): Promise<void> {
     if (this.jobs.has(job.id)) {
-      this.logger.warn(
-        `Cron job with ID ${job.id} already exists. Replacing it.`,
-      );
       this.removeCronJob(job.id);
     }
 
@@ -58,20 +60,24 @@ export class SchedulerService implements OnApplicationBootstrap {
       const cron: CronJob = new CronJob(
         job.schedule,
         async () => {
-          this.logger.log(`Executing cron job: ${job.name}`);
           try {
+            // Trigger url with valid api key
             const response = await fetch(job.triggerUrl, {
-              method: 'POST',
+              method: 'GET',
               headers: { 'x-api-key': job.apiKey },
             });
 
-            const logText = await response.text();
-            this.logger.log(`Response: ${logText}`);
-            const responseData = await response.json();
-            this.logger.log(`Cron job ${job.name} executed successfully.`);
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
-            await this.logCronJobHistory(job.id, 'success', responseData);
+            // Parse the response body based on its content type
+            const data = await response.json(); // Use .text() or .blob() if required
+            console.log('API Response Data:', data);
 
+            await this.logCronJobHistory(job.id, 'success', data);
+
+            await this.logWebhookData(job.id, data);
             // Deactivate the cron-job status
             await this.updateCronJobStatus(job.id, false);
           } catch (error) {
@@ -94,8 +100,6 @@ export class SchedulerService implements OnApplicationBootstrap {
 
       this.jobs.set(job.id, cron);
       cron.start();
-      this.logger.log(`Server current time: ${new Date().toISOString()}`);
-      this.logger.log(`Cron job ${job.name} has been scheduled.`);
       this.logger.log(`Job ${job.name} scheduled for: ${job.schedule}`);
     } catch (error) {
       this.logger.error(
@@ -104,7 +108,8 @@ export class SchedulerService implements OnApplicationBootstrap {
     }
   }
 
-  async test() {
+  // teting cron execution
+  async cronTest() {
     const testCron = new CronJob(
       '*/1 * * * *', // Every minute
       () => {
@@ -117,8 +122,8 @@ export class SchedulerService implements OnApplicationBootstrap {
         );
       },
       null,
-      true, // Start immediately
-      'Asia/Kolkata', // Your desired time zone
+      true,
+      'Asia/Kolkata',
     );
   }
 
@@ -139,10 +144,11 @@ export class SchedulerService implements OnApplicationBootstrap {
     response: any,
   ): Promise<void> {
     try {
-      await this.cronJobModel.updateOne(
-        { _id: cronJobId },
-        { $push: { history: { status, response, triggeredAt: new Date() } } },
-      );
+      this.jobHistoryModel.create({
+        cronJobId: cronJobId,
+        status: status,
+        response: response,
+      });
     } catch (error) {
       this.logger.error(
         `Error logging history for cron job ${cronJobId}: ${error.message}`,
@@ -150,6 +156,20 @@ export class SchedulerService implements OnApplicationBootstrap {
     }
   }
 
+  async logWebhookData(cronJobId: string, data: any): Promise<void> {
+    try {
+      this.webHookModel.create({
+        cronJobId: cronJobId,
+        data: JSON.stringify(data),
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error logging webhook data for cron jon ${cronJobId}: ${error.message}`,
+      );
+    }
+  }
+
+  async;
   async updateCronJobStatus(id: string, isActive: boolean): Promise<void> {
     await this.cronJobModel.findByIdAndUpdate(id, { isActive });
   }

@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose from 'mongoose';
 import { CronJob } from './cron-job.schema';
 
+export type WebHookDocument = WebhookData & Document;
 @Schema({ timestamps: true })
 export class WebhookData {
   @Prop({ type: mongoose.Schema.Types.ObjectId, auto: true })

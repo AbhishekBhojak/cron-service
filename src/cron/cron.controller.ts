@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   ValidationPipe,
+  Headers,
 } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { CronService } from './cron.service';
@@ -108,5 +109,15 @@ export class CronController {
       size: webhook.size,
       total: webhook.total,
     };
+  }
+
+  // Execute cron triggerUrl
+  @Get('trigger-cron')
+  async triggerCron(): Promise<string> {
+    const data: any = {
+      name: 'trigger',
+      subject: 'trigger cron event',
+    };
+    return JSON.stringify(data);
   }
 }

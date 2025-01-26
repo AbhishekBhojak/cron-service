@@ -6,7 +6,7 @@ import {
   CronUpdateRequest,
 } from './dto/request/cron-job.request';
 import { CronJob, CronJobDocument } from './schema/cron-job.schema';
-import { WebhookData } from './schema/webhook-data.schema';
+import { WebhookData, WebHookDocument } from './schema/webhook-data.schema';
 import { PaginatedResponse, QueryOptions } from './interface/api.interface';
 import { getOrder, getWhere } from './decorator';
 import { SchedulerService } from './scheduler.service';
@@ -15,7 +15,8 @@ import { SchedulerService } from './scheduler.service';
 export class CronService {
   constructor(
     @InjectModel(CronJob.name) private cronJobModel: Model<CronJobDocument>,
-    @InjectModel(WebhookData.name) private webhookDataModel: Model<WebhookData>,
+    @InjectModel(WebhookData.name)
+    private webhookDataModel: Model<WebHookDocument>,
     private readonly schedulerService: SchedulerService,
   ) {}
 
